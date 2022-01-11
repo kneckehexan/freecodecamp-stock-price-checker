@@ -7,6 +7,7 @@ const cors        = require('cors');
 const apiRoutes         = require('./routes/api.js');
 const fccTestingRoutes  = require('./routes/fcctesting.js');
 const runner            = require('./test-runner');
+const connectDB = require('./db/connectDB')
 
 const app = express();
 
@@ -37,8 +38,17 @@ app.use(function(req, res, next) {
 });
 
 //Start our server and tests!
-const listener = app.listen(process.env.PORT || 3000, function () {
-  console.log('Your app is listening on port ' + listener.address().port);
+const port = process.env.PORT || 3000;
+
+const start = async () => {
+  try {
+    await connectDB(process.env.MONGO_URI);
+    app.listen(port, () => {
+      console.log(`Server is listening on port ${port}...`)
+    });
+  } catch (e) {
+    console.log(e)
+  }
   if(process.env.NODE_ENV==='test') {
     console.log('Running Tests...');
     setTimeout(function () {
@@ -50,6 +60,22 @@ const listener = app.listen(process.env.PORT || 3000, function () {
       }
     }, 3500);
   }
-});
+}
+
+start();
+//const listener = app.listen(process.env.PORT || 3000, function () {
+//  console.log('Your app is listening on port ' + listener.address().port);
+//  if(process.env.NODE_ENV==='test') {
+//    console.log('Running Tests...');
+//    setTimeout(function () {
+//      try {
+//        runner.run();
+//      } catch(e) {
+//        console.log('Tests are not valid:');
+//        console.error(e);
+//      }
+//    }, 3500);
+//  }
+//});
 
 module.exports = app; //for testing
