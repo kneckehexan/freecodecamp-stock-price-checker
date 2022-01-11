@@ -1,5 +1,6 @@
 'use strict';
 require('dotenv').config();
+require('express-async-errors')
 const express     = require('express');
 const bodyParser  = require('body-parser');
 const cors        = require('cors');
@@ -43,7 +44,8 @@ app.route('/')
 fccTestingRoutes(app);
 
 //Routing for API 
-apiRoutes(app);  
+//apiRoutes(app);  
+app.use('/api/stock-prices', apiRoutes)
     
 //404 Not Found Middleware
 app.use(function(req, res, next) {

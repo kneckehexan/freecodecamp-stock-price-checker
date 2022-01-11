@@ -1,12 +1,10 @@
 'use strict';
 
-const IP = require('../models/IP');
+const express = require('express')
+const router = express.Router();
 
-module.exports = function (app) {
+const {getStock} = require('../controllers/stock');
 
-  app.route('/api/stock-prices')
-    .get(function (req, res){
-      
-    });
-    
-};
+router.route('/').get(getStock);
+
+module.exports = router;
