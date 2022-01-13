@@ -15,35 +15,32 @@ const getStock = async (req, res) => {
     
     var price = JSON.parse(stockData.text).latestPrice;
 
-    if (like){
-      const ip = req.socket.remoteAddress; // Get users IP.
-      const stockInDB = await Stock.findOne({stock: stock}); // See if stock is in our db.
-      var foundLiked = false;
-      if(!stockInDB) {
-        await Stock.create({stock: stock, ip: [await hashIP(ip)]}); // If no stock in db, create it, add user's ip but hashed.
-      } else {
-        for(i = 0; i < stockInDB.ip.length; i++){
-          if (bcrypt.compare(ip, stockInDB.ip[i])){
-            continue;
-          } else {
-            foundLiked = true;
-            break;
-          }
-        }
-        if (!foundLiked) {
-          var iph = await hashIP(ip)
-          await stockInDB.ip.push(iph);
+    var likes = 0;
+    const ip = req.socket.remoteAddress;
+    var foundIP = false;
+    const stockInDB = await Stock.findOne({stock: stock});
+
+    if (!stockInDB && like) { // Stock doesn't exist in DB but was liked: add it and set likes to 1.
+      await Stock.create({stock: stock, ip: [await hashIP(ip)]});
+      likes = 1;
+    } else if (stockInDB && like) { // Stock does exist and was liked.
+      var ipLength = stockInDB.ip.length;
+      for (i = 0; i < ipLength; i++) {
+        if (bcrypt.compare(ip, stockInDB.ip[i])) {
+          foundIP = true;
+          break;
         }
       }
+      likes = ipLength;
+      if (!foundIP) { // If user's ip doesn't exist, add it do db and add 1 to the likes.
+        await stockInDB.ip.push([await hashIP(ip)]);
+        likes += 1;
+      }
+    } else if (stockInDB && !like) { // If the stock exists but wasn't liked.
+      likes = stockInDB.ip.length;
     }
-    const likes = await Stock.find({stock: stock});
-    console.log(likes);
-    var like = 0;
-    if (likes){
-      like = likes[0].ip.length;
-    }
-    console.log(likes)
-    return res.json({stockData: {stock: stock, price: price, likes: like}});
+
+    return res.json({stockData: {stock: stock, price: price, likes: likes}});
   }
 }
 
