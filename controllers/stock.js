@@ -4,46 +4,69 @@ const bcrypt = require('bcrypt')
 
 const getStock = async (req, res) => {
   var {stock, like} = req.query;
-  stock = stock.toUpperCase(); // In order to keep some visual structure in the db.
   like = (like === 'true'); // req.query gives a string, which here is turned into bool.
+  const ip = req.socket.remoteAddress;
 
-  if (stock){
-    const stockData = await stockPriceChecker(stock);
-    if(!stockData){
-      return res.json({error: "no stock by that name"});
+  if (!Array.isArray(stock)) {
+    stock = [stock];
+  }
+
+  var stockData = [];
+  for (var s of stock) {
+    s = s.toUpperCase()
+    sd = await stockPriceChecker(s);
+    if (!sd) {
+      stockData.push({stock: 'stock not found', price: 0})
+    } else {
+      stockData.push({stock: s, price: sd.body.latestPrice});
     }
-    
-    var price = JSON.parse(stockData.text).latestPrice;
+  }
 
-    var likes = 0;
-    const ip = req.socket.remoteAddress;
-    var foundIP = false;
-    const stockInDB = await Stock.findOne({stock: stock});
-
-    if (!stockInDB && like) { // Stock doesn't exist in DB but was liked: add it and set likes to 1.
-      await Stock.create({stock: stock, ip: [await hashIP(ip)]});
-      likes = 1;
-    } else if (stockInDB && like) { // Stock does exist and was liked.
-      var ipLength = stockInDB.ip.length;
-      for (i = 0; i < ipLength; i++) {
-        if (bcrypt.compare(ip, stockInDB.ip[i])) {
-          foundIP = true;
-          break;
-        }
-      }
-      likes = ipLength;
-      if (!foundIP) { // If user's ip doesn't exist, add it do db and add 1 to the likes.
-        await stockInDB.ip.push([await hashIP(ip)]);
-        likes += 1;
-      }
-    } else if (stockInDB && !like) { // If the stock exists but wasn't liked.
-      likes = stockInDB.ip.length;
+  if (stock.length == 1) {
+    var result = await buildStockLikes(stockData[0].stock, stockData[0].price, ip, like)
+    return res.json({stockData: result});
+  } else if (stock.length == 2) {
+    var result = [];
+    for (var s of stockData) {
+      result.push(await buildStockLikes(s.stock, s.price, ip, like));
     }
-
-    return res.json({stockData: {stock: stock, price: price, likes: likes}});
+    rel_likes = result[0].likes - result[1].likes
+    result[0]['rel_likes'] = rel_likes;
+    result[1]['rel_likes'] = -rel_likes;
+    for (var r of result) {
+      delete r.likes;
+    }
+    return res.json({stockData: result});
   }
 }
 
+
+const buildStockLikes = async (stock, price, ip, like) => {
+  var likes = 0;
+  var foundIP = false;
+  const stockInDB = await Stock.findOne({stock: stock});
+
+  if (!stockInDB && like) { // Stock doesn't exist in DB but was liked: add it and set likes to 1.
+    await Stock.create({stock: stock, ip: [await hashIP(ip)]});
+    likes = 1;
+  } else if (stockInDB && like) { // Stock does exist and was liked.
+    var ipLength = stockInDB.ip.length;
+    for (i = 0; i < ipLength; i++) {
+      if (bcrypt.compare(ip, stockInDB.ip[i])) {
+        foundIP = true;
+        break;
+      }
+    }
+    likes = ipLength;
+    if (!foundIP) { // If user's ip doesn't exist, add it do db and add 1 to the likes.
+      await stockInDB.ip.push([await hashIP(ip)]);
+      likes += 1;
+    }
+  } else if (stockInDB && !like) { // If the stock exists but wasn't liked.
+    likes = stockInDB.ip.length;
+  }
+  return {stock: stock, price: price, likes: likes};
+}
 
 const stockPriceChecker = async (stock) => {
   try{
@@ -57,6 +80,7 @@ const stockPriceChecker = async (stock) => {
 const hashIP = async (ip) => {
   return bcrypt.hash(ip, 10);
 }
+
 
 module.exports = {
   getStock
