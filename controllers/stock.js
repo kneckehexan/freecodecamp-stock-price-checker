@@ -13,22 +13,29 @@ const getStock = async (req, res) => {
 
   var stockData = [];
   for (var s of stock) {
-    s = s.toUpperCase()
+    s = s.toUpperCase(); // To keep it tidy in DB.
     sd = await stockPriceChecker(s);
-    if (!sd) {
-      stockData.push({stock: 'stock not found', price: 0})
+    if (!sd || typeof sd.body === 'string') { // stockPriceChecker returns object if it contains anything of value
+      stockData.push({error: 'external source error', likes: 0});
     } else {
       stockData.push({stock: s, price: sd.body.latestPrice});
     }
   }
 
   if (stock.length == 1) {
-    var result = await buildStockLikes(stockData[0].stock, stockData[0].price, ip, like)
-    return res.json({stockData: result});
-  } else if (stock.length == 2) {
+    if (!stockData[0].hasOwnProperty('error')) {
+      var result = await buildStockLikes(stockData[0].stock, stockData[0].price, ip, like)
+    } else {
+      var result = stockData;
+    }
+  } else if (stock.length == 2) { // If more stock were to be added, then rel_likes would be broken and the app wouldn't work anyway.
     var result = [];
     for (var s of stockData) {
-      result.push(await buildStockLikes(s.stock, s.price, ip, like));
+      if (!s.hasOwnProperty('error')) { // Repetition of code (see above). Could be improved.
+        result.push(await buildStockLikes(s.stock, s.price, ip, like));
+      } else {
+        result.push(s);
+      }
     }
     rel_likes = result[0].likes - result[1].likes
     result[0]['rel_likes'] = rel_likes;
@@ -36,8 +43,10 @@ const getStock = async (req, res) => {
     for (var r of result) {
       delete r.likes;
     }
-    return res.json({stockData: result});
+  } else {
+    var result = 'app broken';
   }
+  return res.json({stockData: result});
 }
 
 
@@ -73,7 +82,9 @@ const stockPriceChecker = async (stock) => {
     var url = 'https://stock-price-checker-proxy.freecodecamp.rocks/v1/stock/' + stock + '/quote';
     return await superagent.get(url)
   } catch(e) {
-    console.error(e);
+    if (e.status === 404) {
+      return false;
+    }
   }
 }
 
