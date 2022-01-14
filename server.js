@@ -9,6 +9,7 @@ const apiRoutes         = require('./routes/api.js');
 const fccTestingRoutes  = require('./routes/fcctesting.js');
 const runner            = require('./test-runner');
 const connectDB = require('./db/connectDB');
+const Stock = require('./models/Stock');
 const helmet = require('helmet');
 const xss = require('xss-clean');
 
@@ -60,6 +61,7 @@ const port = process.env.PORT || 3000;
 const start = async () => {
   try {
     await connectDB(process.env.MONGO_URI);
+    await Stock.deleteMany({}); // For the purpose of this app we don't care about saving any data, so any time the app connects, all data in the DB will be deleted.
     app.listen(port, () => {
       console.log(`Server is listening on port ${port}...`)
     });
